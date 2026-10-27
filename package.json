@@ -1,0 +1,23 @@
+{
+  "name": "atlassian-dc-app-ui-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/atl.mjs setup",
+    "start": "node scripts/atl.mjs start",
+    "stop": "node scripts/atl.mjs stop",
+    "shutdown": "node scripts/atl.mjs shutdown",
+    "restore": "node scripts/atl.mjs restore",
+    "status": "node scripts/atl.mjs status",
+    "logs": "node scripts/atl.mjs logs",
+    "test": "node scripts/atl.mjs test",
+    "test:smoke": "node scripts/atl.mjs test --grep @smoke",
+    "check": "node scripts/check-test-rules.mjs && tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}

@@ -50,7 +50,9 @@ cmd_download() {
     rm -f "$ARCHIVE_FILE"
   fi
   log "downloading $ARCHIVE_URL"
-  curl -fL -sS --retry 3 -o "$ARCHIVE_FILE.part" "$ARCHIVE_URL" \
+  # curl.exe (Git for Windows) is a Windows program: with MSYS_NO_PATHCONV=1 it cannot write to a
+  # /c/... path ("curl: (23) client returned ERROR on write"), so it gets the C:/ form.
+  curl -fL -sS --retry 3 -o "$(hostpath "$ARCHIVE_FILE.part")" "$ARCHIVE_URL" \
     || fail "download failed" "curl -I $ARCHIVE_URL   (or place the archive manually at $ARCHIVE_FILE)"
   mv "$ARCHIVE_FILE.part" "$ARCHIVE_FILE"
   if [ -n "${ARCHIVE_MD5:-}" ] && [ "$(md5_of "$ARCHIVE_FILE")" != "$ARCHIVE_MD5" ]; then

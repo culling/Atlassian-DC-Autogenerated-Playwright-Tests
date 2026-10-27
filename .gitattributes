@@ -1,0 +1,5 @@
+# Keep LF line endings in the working copy on Windows: bash scripts with CRLF do not run.
+* text=auto eol=lf
+*.obr binary
+*.jar binary
+*.png binary

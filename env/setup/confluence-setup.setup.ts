@@ -1,12 +1,12 @@
 // First-time setup of a host instance. Run with: env/atl-env.sh <profile> setup
 // Input comes from environment variables set by env/atl-env.sh (profile + .env.local).
 import { test } from '@playwright/test';
-import { Confluence8Wizard } from './wizards/Confluence8Wizard.js';
+import { Confluence6Wizard } from './wizards/Confluence6Wizard.js';
 import { Confluence9Wizard } from './wizards/Confluence9Wizard.js';
 import type { SetupWizard } from './wizards/SetupWizard.js';
 
 const wizards: Record<string, () => SetupWizard> = {
-  'confluence-8': () => new Confluence8Wizard(),
+  'confluence-6': () => new Confluence6Wizard(),
   'confluence-9': () => new Confluence9Wizard(),
 };
 

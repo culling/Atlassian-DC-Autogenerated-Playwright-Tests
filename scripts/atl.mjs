@@ -9,8 +9,8 @@
 //   logs       follow the product log
 //   test       run Playwright; --env picks the host project(s); --autoshutdown stops them afterwards
 //
-// `--env confluence:8.5.31` and `--env confluence-8.5.31` both mean profile `confluence-8.5.31`.
-// npm may pass the value as a plain argument (`npm run test --env confluence:8.5.31`) or as
+// `--env confluence:6.6.17` and `--env confluence-6.6.17` both mean profile `confluence-6.6.17`.
+// npm may pass the value as a plain argument (`npm run test --env confluence:6.6.17`) or as
 // npm_config_env (`--env=...`); both are accepted here. Arguments this script does not know are
 // passed to Playwright.
 //
@@ -41,7 +41,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--env') {
-      if (!argv[i + 1]) fail('--env needs a value, for example --env confluence:8.5.31');
+      if (!argv[i + 1]) fail('--env needs a value, for example --env confluence:6.6.17');
       envs.push(...argv[++i].split(','));
     } else if (a.startsWith('--env=')) envs.push(...a.slice(6).split(','));
     else if (a === '--autoshutdown') autoshutdown = true;
@@ -51,10 +51,10 @@ function parseArgs(argv) {
   return { envs: [...new Set(envs.map(toProfile))], autoshutdown, rest };
 }
 
-/** confluence:8.5.31 -> confluence-8.5.31 */
+/** confluence:6.6.17 -> confluence-6.6.17 */
 function toProfile(value) {
   const name = value.trim().replace(':', '-');
-  if (!ENV_VALUE.test(name)) fail(`not an environment name: "${value}" (expected for example confluence:8.5.31)`);
+  if (!ENV_VALUE.test(name)) fail(`not an environment name: "${value}" (expected for example confluence:6.6.17)`);
   return name;
 }
 
@@ -144,7 +144,7 @@ async function main() {
   }
   const { envs, autoshutdown, rest } = parseArgs(argv);
   if (!envs.length && !ALL_BY_DEFAULT.has(command)) {
-    fail(`${command} needs --env, for example: npm run ${command} -- --env confluence:8.5.31`);
+    fail(`${command} needs --env, for example: npm run ${command} -- --env confluence:6.6.17`);
   }
 
   if (command === 'test') process.exit(await runTests(envs, autoshutdown, rest));

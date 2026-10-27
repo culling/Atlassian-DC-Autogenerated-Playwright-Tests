@@ -30,33 +30,33 @@ async function check(res: Awaited<ReturnType<APIRequestContext['get']>>, what: s
 export class ConfluenceRest {
   constructor(private readonly request: APIRequestContext, private readonly creds: Credentials) {}
 
-  async createSpace(key: string, name: string): Promise<void> {
-    const res = await this.request.post('rest/api/space', {
+  /**
+   * Creates a user with the JSON-RPC remote API. Confluence 6.6 has no REST endpoint for creating users
+   * (verified on 6.6.17: addUser answers HTTP 200 and the user then exists in /rest/api/user). Also works on 9.5.4.
+   */
+  async createUser(username: string, fullName: string, password: string): Promise<void> {
+    const res = await this.request.post('rpc/json-rpc/confluenceservice-v2/addUser', {
       headers: authHeader(this.creds),
-      data: { key, name },
+      data: [{ name: username, fullname: fullName, email: `${username}@example.com` }, password],
     });
-    await check(res, `create space ${key}`);
+    await check(res, `create user ${username}`);
+    // JSON-RPC reports errors with HTTP 200 and an "error" member.
+    const body = await res.text();
+    if (body.includes('"error"')) throw new Error(`create user ${username} failed: ${body}`);
   }
 
-  async deleteSpace(key: string): Promise<void> {
-    const res = await this.request.delete(`rest/api/space/${key}`, { headers: authHeader(this.creds) });
-    // 202 = deletion queued; 404 = already gone. Both are fine for teardown.
-    if (res.status() !== 404) await check(res, `delete space ${key}`);
+  async removeUser(username: string): Promise<void> {
+    const res = await this.request.post('rpc/json-rpc/confluenceservice-v2/removeUser', {
+      headers: authHeader(this.creds),
+      data: [username],
+    });
+    await check(res, `remove user ${username}`);
   }
 
-  /** Creates a page and returns its id. `storageBody` is Confluence storage format (XHTML). */
-  async createPage(spaceKey: string, title: string, storageBody = ''): Promise<string> {
-    const res = await this.request.post('rest/api/content', {
-      headers: authHeader(this.creds),
-      data: {
-        type: 'page',
-        title,
-        space: { key: spaceKey },
-        body: { storage: { value: storageBody, representation: 'storage' } },
-      },
-    });
-    await check(res, `create page "${title}"`);
-    return String((await res.json()).id);
+  /** Removes every EasySSO custom authentication (header) rule. Same endpoint the app's admin page saves to. */
+  async clearEasySsoHeaderRules(): Promise<void> {
+    const res = await this.request.put('rest/easysso/1.0/headers', { headers: authHeader(this.creds), data: [] });
+    await check(res, 'clear EasySSO header rules');
   }
 
   /** Reads the installed version of an app from UPM. Used only for failure evidence. */

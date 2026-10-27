@@ -10,9 +10,9 @@ export default defineConfig<SuiteOptions>({
   testDir: './tests',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // One Confluence instance per target; parallel editing of different pages is fine,
-  // but keep it low so a laptop-sized instance is not overloaded.
-  workers: 2,
+  // One worker: the EasySSO settings the tests change (header rules) are site-wide, so two tests that
+  // change them at the same time would break each other.
+  workers: 1,
   timeout: 90_000,
   expect: { timeout: 15_000 },
   reporter: [
@@ -33,12 +33,6 @@ export default defineConfig<SuiteOptions>({
     {
       name: `setup-${t.name}`,
       testMatch: /setup[\\/].*\.setup\.ts/,
-      teardown: `teardown-${t.name}`,
-      use: { baseURL: baseURLOf(t), hostBaseURL: baseURLOf(t), adapterName: t.adapter, targetName: t.name, hostVersion: t.version },
-    },
-    {
-      name: `teardown-${t.name}`,
-      testMatch: /setup[\\/].*\.teardown\.ts/,
       use: { baseURL: baseURLOf(t), hostBaseURL: baseURLOf(t), adapterName: t.adapter, targetName: t.name, hostVersion: t.version },
     },
     {

@@ -1,0 +1,11 @@
+node_modules/
+env/downloads/
+env/instances/
+apps/*.jar
+apps/*.obr
+test-results/
+playwright-report/
+env/setup/test-results/
+env/setup/playwright-report/
+.auth/
+.env.local

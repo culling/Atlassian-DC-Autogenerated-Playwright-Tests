@@ -1,10 +1,10 @@
-import { Confluence8Adapter } from './Confluence8Adapter.js';
+import { Confluence6Adapter } from './Confluence6Adapter.js';
 
 /**
- * Confluence 9.x. Verified on 9.2.26: same legacy editor, macro browser and UPM screens as 8.5;
- * only the login page is redesigned (docs/notes/hosts.md).
+ * Confluence 9.x. Verified on 9.5.4: same header user menu as 6.6; only the login page is redesigned
+ * (docs/notes/hosts.md).
  */
-export class Confluence9Adapter extends Confluence8Adapter {
+export class Confluence9Adapter extends Confluence6Adapter {
   override readonly name: string = 'confluence-9';
   protected override loginFields = { username: '#username-field', password: '#password-field', submit: '#login-button' };
 }

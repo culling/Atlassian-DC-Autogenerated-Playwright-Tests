@@ -24,7 +24,7 @@ const rules = [
   ['host branching in spec (if host/adapter === ...)', /if\s*\(.*(adapterName|hostVersion|targetName|host)\b.*===?/, (f) => inDir(f, 'specs')],
   ['raw selector in spec (page.locator / $ / $$)', /\.locator\(|\.\$\$?\(/, (f) => inDir(f, 'specs')],
   ['HTTP call outside fixtures/setup', /\brequest\.(get|post|put|delete|patch|fetch)\(|\bfetch\(|\bnew\s+ConfluenceRest\b/, (f) => (inDir(f, 'specs') || inDir(f, 'pages') || inDir(f, 'adapters'))],
-  ['rest fixture used in a spec test body', /\brest\.(?!createPage|createSpace|deleteSpace)\w+\(/, (f) => inDir(f, 'specs')],
+  ['rest fixture used in a spec test body', /\brest\.\w+\(/, (f) => inDir(f, 'specs')],
 ];
 
 let problems = 0;

@@ -1,7 +1,9 @@
 # Atlassian DC app UI tests
 
 Playwright end-to-end tests for TechTime apps on Atlassian Data Center hosts.
-First app under test: **Embed Google Maps Pro** on Confluence.
+Current app under test: **EasySSO for Confluence** on Confluence 6.6.17 and 9.5.4.
+
+The previous project (Embed Google Maps Pro on Confluence 8.5.31 and 9.2.26) is in `_reference/`, unchanged. It is a complete, separate copy with its own `README.md`, `CLAUDE.md`, `package.json` and environment data.
 
 The repository has two independent parts:
 
@@ -16,122 +18,108 @@ The tests do not call anything in `env/`. You can point them at an instance buil
 
 | Profile | Confluence | Java | PostgreSQL | URL | DB port |
 |---|---|---|---|---|---|
-| `confluence-8.5.31` | 8.5.31 (LTS) | Temurin 17 | 14 | http://127.0.0.1:8090 | 5433 |
-| `confluence-9.2.26` | 9.2.26 (LTS) | Temurin 17 | 16 | http://127.0.0.1:8100 | 5434 |
+| `confluence-6.6.17` | 6.6.17 (Enterprise release) | Temurin 8 | 9.6 | http://127.0.0.1:8066 | 5436 |
+| `confluence-9.5.4` | 9.5.4 (newest Confluence 9) | Temurin 21 | 16 | http://127.0.0.1:8095 | 5437 |
 
-App under test: `apps/confluence.plugins.googlemapsembed-8.1.5.obr` (compatible with Confluence 7.0.1 – 9.5.4).
+App under test: `apps/confluence.plugins.easysso-5.2.4.obr`: EasySSO 5.2.4, the newest version for Confluence below 10 (Confluence 6.0.1 – 9.5.4). Download it from https://marketplace.atlassian.com/download/apps/1212583/version/5002004000.
 
-Login on both: `admin` / `admin` (from `.env.local`).
+The ports differ from the `_reference` hosts (8090, 8100), so both projects can run at the same time.
+
+Why 9.5.4 and not 9.2.26: 9.5.4 is the newest Confluence 9 and the newest host EasySSO 5.2.4 supports. A profile named `confluence-9.2.26` would use the same Docker containers and volumes as the `_reference` 9.2.26 instance (the names come from the profile name).
+
+Login: `admin` / `admin` (from `.env.local`).
+
+**One-node cluster (6.6.17 only):** Confluence 6.6 accepts a Data Center licence only as a cluster. The setup creates a cluster with one node. This does not change how you use it.
 
 ## One-time preparation
 
 1. Install Docker Desktop and Node.js.
 2. Run `npm install` and `npx playwright install chromium`.
 3. Copy `.env.local.example` to `.env.local` and fill it in (admin user, timebomb licences). `.env.local` is git-ignored. Never commit licence keys.
-4. Put the app file where the profiles' `APP_FILES` points (currently `apps/confluence.plugins.googlemapsembed-8.1.5.obr`).
+4. Put the app file at `apps/confluence.plugins.easysso-5.2.4.obr` (link above).
 
 ## npm commands
 
-Run these from the repository root, in any terminal (PowerShell, cmd or Git Bash). `--env` names a host as `<product>:<version>`, for example `confluence:8.5.31` or `confluence:9.2.26`.
+Run these from the repository root, in any terminal (PowerShell, cmd or Git Bash). `--env` names a host as `<product>:<version>`.
 
 ```
-npm run setup    -- --env confluence:8.5.31   # first time: full build (download, install, start, setup wizard, install app, snapshot)
-npm run start    -- --env confluence:8.5.31   # start an instance and wait until it is RUNNING
-npm run restore  -- --env confluence:8.5.31   # back to the clean snapshot (also starts it)
+npm run setup    -- --env confluence:6.6.17   # first time: full build (download, install, start, setup wizard, install app, snapshot)
+npm run start    -- --env confluence:6.6.17   # start the instance and wait until it is RUNNING
+npm run restore  -- --env confluence:6.6.17   # back to the clean snapshot (also starts it)
 npm run status                                # state of every instance (or one with --env)
-npm run logs     -- --env confluence:8.5.31   # follow the product log (Ctrl+C to stop)
-npm run shutdown -- --env confluence:8.5.31   # stop an instance (without --env: stop all); same as npm run stop
+npm run logs     -- --env confluence:6.6.17   # follow the product log (Ctrl+C to stop)
+npm run shutdown -- --env confluence:6.6.17   # stop the instance (without --env: stop all); same as npm run stop
 
-npm run test       -- --env confluence:9.2.26                  # all tests on one host
-npm run test:smoke -- --env confluence:9.2.26                  # @smoke tests on one host
-npm run test:smoke -- --env confluence:9.2.26 --autoshutdown   # stop the host after the tests (also when tests fail)
-npm run test:smoke                                             # every host in tests/targets.ts
+npm run test       -- --env confluence:6.6.17                  # all tests
+npm run test:smoke -- --env confluence:6.6.17                  # @smoke tests
+npm run test:smoke -- --env confluence:6.6.17 --autoshutdown   # stop the host after the tests (also when tests fail)
 npm run check                                                  # selector/API rule check + TypeScript check
 npm run report                                                 # HTML report of the last run
 ```
 
+Every command takes either host, for example `--env confluence:9.5.4`. Several hosts: `--env confluence:6.6.17,confluence:9.5.4`.
+
 Rules:
 
-1. **Use `--` before the options** (as above). Without it, npm prints "Unknown cli config" warnings. Writing `npm run start --env confluence:8.5.31` still works, but npm says this form will stop working in its next major version.
-2. Several hosts at once: `--env confluence:8.5.31,confluence:9.2.26`.
-3. `confluence-8.5.31` (the profile name) is accepted as well as `confluence:8.5.31`.
-4. Other options after `--` go to Playwright, for example `npm run test -- --env confluence:9.2.26 --repeat-each=10` or `--headed`.
-5. `test` first checks that each selected host reports `RUNNING` on `/status`. If not, it stops and prints the `npm run start` command. Without `--env`, every host in `tests/targets.ts` must be running.
-6. `--autoshutdown` stops only hosts that have a profile in `env/profiles/` (not instances built elsewhere). The exit code is the test result.
-7. `setup`, `start`, `restore` and `logs` need `--env`. `status`, `shutdown` and `stop` without `--env` act on every profile.
+1. **Use `--` before the options** (as above). Without it, npm prints "Unknown cli config" warnings. `npm run start --env confluence:6.6.17` still works, but npm says this form will stop working in its next major version.
+2. `confluence-6.6.17` (the profile name) is accepted as well as `confluence:6.6.17`.
+3. Other options after `--` go to Playwright, for example `npm run test -- --env confluence:6.6.17 --repeat-each=10` or `--headed`.
+4. `test` first checks that the host reports `RUNNING` on `/status`. If not, it stops and prints the `npm run start` command.
+5. `--autoshutdown` stops only hosts that have a profile in `env/profiles/`. The exit code is the test result.
+6. `setup`, `start`, `restore` and `logs` need `--env`. `status`, `shutdown` and `stop` without `--env` act on every profile.
 
-The npm commands call `env/atl-env.sh` through Git Bash (`scripts/atl.mjs`). They look for Git Bash in `C:\Program Files\Git\bin\bash.exe` and `%LOCALAPPDATA%\Programs\Git\bin\bash.exe`. On Windows, the `bash` on PATH can be WSL's bash, so it is not used. Set `ATL_BASH` to the full path of `bash.exe` if Git Bash is installed somewhere else.
+The npm commands call `env/atl-env.sh` through Git Bash (`scripts/atl.mjs`). They look for Git Bash in `C:\Program Files\Git\bin\bash.exe` and `%LOCALAPPDATA%\Programs\Git\bin\bash.exe`. Set `ATL_BASH` to the full path of `bash.exe` if Git Bash is installed somewhere else.
 
 Typical session:
 
-1. `npm run restore -- --env confluence:9.2.26` (clean data, fresh licence period; about 6 min).
-2. `npm run test:smoke -- --env confluence:9.2.26 --autoshutdown`.
+1. `npm run restore -- --env confluence:6.6.17` (clean data, fresh licence period).
+2. `npm run test:smoke -- --env confluence:6.6.17 --autoshutdown`.
 
 ## Environment commands (Git Bash, direct)
 
-The npm commands above cover the usual steps. The script has more commands. Replace `<profile>` with `confluence-8.5.31` or `confluence-9.2.26`.
-
 ```
-env/atl-env.sh <profile> up            # first time: download, install, start, setup wizard, install app, snapshot
-env/atl-env.sh <profile> restore       # back to the clean snapshot
-env/atl-env.sh <profile> status        # stopped / starting / FIRST_RUN / RUNNING
-env/atl-env.sh <profile> start
-env/atl-env.sh <profile> stop
-env/atl-env.sh <profile> install-app   # re-install the app after you change the OBR/JAR
-env/atl-env.sh <profile> logs          # follow the product log
-env/atl-env.sh <profile> reset         # delete all data of this instance (the snapshot is kept)
+env/atl-env.sh confluence-6.6.17 up            # first time: download, install, start, setup wizard, install app, snapshot
+env/atl-env.sh confluence-6.6.17 restore       # back to the clean snapshot
+env/atl-env.sh confluence-6.6.17 status        # stopped / starting / FIRST_RUN / RUNNING
+env/atl-env.sh confluence-6.6.17 start
+env/atl-env.sh confluence-6.6.17 stop
+env/atl-env.sh confluence-6.6.17 install-app   # re-install the app after you change the OBR/JAR
+env/atl-env.sh confluence-6.6.17 logs          # follow the product log
+env/atl-env.sh confluence-6.6.17 reset         # delete all data of this instance (the snapshot is kept)
 ```
 
 Measured times on this machine (10 CPUs, 15.5 GB for Docker):
 
-| Step | 8.5.31 | 9.2.26 |
+| Step | 6.6.17 | 9.5.4 |
 |---|---|---|
-| `up` (archive already downloaded) | 15.5 min | 14.4 min |
-| `restore` | 5.5 min | 6.3 min |
-| `start` of a set-up instance | 2–2.5 min | 5.4 min (once, after a restore) |
-| `@smoke` × 10 repeats, both hosts together | 5.0 min (86 runs incl. setup/teardown) | |
+| `npm run setup` (`up`) from a clean `reset`, archive already downloaded | 19.7 min (setup wizard 8.6 min) | not measured in total (setup wizard 4.6 min) |
+| `restore` | 6.8 min | 5.0 min |
+| `snapshot` | 7.4 min | not measured |
+| `start` of a set-up instance | 3.2–3.5 min to RUNNING | 135 s to RUNNING |
+| `@smoke` × 10 repeats | 22–45 s (11 runs incl. login) | 24.5 s (11 runs incl. login) |
 
-Both instances can run at the same time. Each uses up to 2 GB of memory for Java, plus its database.
-
-**Licences:** after about 3 hours the timebomb licences make the site read-only. The test setup step then fails with `create space ... failed: HTTP 403`. `npm run restore -- --env <host>` fixes it (verified on 9.2.26, 2026-10-27). Not yet known: whether a plain `start` also resets the 3 hours. Run `restore` before a test session.
+**Licences:** after about 3 hours the timebomb licences make the site read-only. Run `npm run restore -- --env confluence:6.6.17` before a test session. On 9.2.26 `restore` was verified to reset the 3 hours; on 6.6.17 this is not verified yet.
 
 ## Running the tests
 
-Use the npm commands above. The same runs with Playwright directly:
+What one run does:
 
-```
-npx playwright test --grep @smoke                    # smoke tests on all hosts
-npx playwright test --project confluence-9.2.26      # one host only
-```
+1. `setup-<host>` (for example `setup-confluence-9.5.4`): logs in once as administrator.
+2. `<host>` (for example `confluence-9.5.4`): the tests.
 
-Without `--project` (or `--env`), the tests run on **every** host in `tests/targets.ts`.
+Without `--env`, `npm run test` runs every host in `tests/targets.ts`, and first checks that all of them are running.
 
-What one run does, per host:
+Current tests (folder `tests/specs/easysso/`):
 
-1. `setup-<host>`: logs in once and creates one test space for the run.
-2. `<host>`: the tests. Each test gets a new empty page in that space.
-3. `teardown-<host>`: deletes the test space.
+`@smoke` (`http-headers.spec.ts`, 1 test): a header rule with "Get Username" logs in the user named in the header.
 
-Current tests (folder `tests/specs/google-maps-pro/`):
+1. Before the test: a new user is created, and all EasySSO header rules are removed (REST).
+2. The administrator opens **EasySSO Admin > Headers** and adds the rule: type Header, name `X-Atl-Test-User`, "Get Username" on. Save shows "Saved".
+3. A new browser with no login cookie sends `X-Atl-Test-User: <the new user>` and opens the dashboard. The header shows that user as logged in; no login form.
+4. A new browser without the header opens the dashboard and gets the login form.
+5. After the test: the rules are removed and the user is deleted (REST).
 
-`@smoke` (`smoke.spec.ts`, 4 tests):
-
-1. The app is installed and enabled (Manage apps).
-2. Insert a Google Maps macro with an address and view the page: the map iframe has the address in its `src`.
-3. Edit an existing map and change Map Type to Satellite: the `src` changes to `maptype=satellite`.
-4. An invalid Google Map link shows "Error in Macro Parameters: Invalid Google Maps Link".
-
-`@full` (22 tests; `npm run test -- --env <host> --grep @full`):
-
-| File | Tests | What is checked |
-|---|---|---|
-| `unicode.spec.ts` | 4 | Japanese, Arabic, Cyrillic, accents + emoji locations: correct `q=` encoding and `language=` code |
-| `place-links.spec.ts` | 3 | Place links (`/maps/place/...`) by name, unicode name, and with coordinates: place embed, `center=` |
-| `list-of-addresses.spec.ts` | 8 | List of Addresses macro: marker count, size/map type/language; unknown addresses and bad strings give the error line "Address N of M - Google Maps cannot find this address" |
-| `pdf-export.spec.ts` | 2 | Export to PDF of a page with each macro: the download is a PDF with a 600 × 400 map image |
-| `xss.spec.ts` | 5 | Script payloads in Location, Title, Google Map link and the list body do not run and stay visible as text |
-
-The tests need internet access: the app asks Google for place ids and coordinates while the page renders.
+The tests run with 1 worker: the header rules are a site-wide setting, so two tests changing them at the same time would break each other.
 
 Passing runs leave no screenshots, traces or videos. Failing tests attach a screenshot, a trace, the host and app versions, browser console errors, and the last 200 lines of the product log.
 
@@ -139,32 +127,24 @@ Passing runs leave no screenshots, traces or videos. Failing tests attach a scre
 
 Set these environment variables:
 
-- `ATL_BASE_URL_CONFLUENCE_8_5_31` or `ATL_BASE_URL_CONFLUENCE_9_2_26` (for example `https://host/`)
+- `ATL_BASE_URL_CONFLUENCE_6_6_17` or `ATL_BASE_URL_CONFLUENCE_9_5_4` (for example `https://host/`)
 - `ATL_ADMIN_USER` and `ATL_ADMIN_PASSWORD`
 - optional: `ATL_LOG_FILE=<path>` for the product log attached to failures
+
+The instance needs the JSON-RPC remote API (used to create the test user).
 
 ## Troubleshooting
 
 | Symptom | Cause | What to do |
 |---|---|---|
-| `http://localhost:8090` does not load | On this machine `localhost` goes to IPv6 `::1`, held by `wslrelay` | Use `http://127.0.0.1:8090` |
+| `http://localhost:8066` does not load | On this machine `localhost` goes to IPv6 `::1`, held by `wslrelay` | Use `http://127.0.0.1:8066` |
 | `docker is not on PATH` | Terminal opened before Docker Desktop was installed | Open a new terminal; the script also finds Docker in its default install folders |
-| Pages are read-only, or `create space ... failed: HTTP 403` | Timebomb licence expired (about 3 h after setup/restore) | `npm run restore -- --env <host>` |
-| `[atl] confluence-… is not reachable` | The host is stopped | `npm run start -- --env <host>` |
+| Pages are read-only | Timebomb licence expired (about 3 h after setup/restore) | `npm run restore -- --env confluence:6.6.17` |
+| `[atl] confluence-… is not reachable` | The host is stopped | `npm run start -- --env confluence:6.6.17` |
 | `[atl] Git Bash not found` | Git Bash is not in a default folder | Set `ATL_BASH` to the full path of `bash.exe` |
 | npm prints `Unknown cli config "--env"` | Options given without `--` | Put `--` before the options |
-| `download failed` with curl error 23 | Seen once; cause unknown | Run `download` again, or place the archive in `env/downloads/` by hand |
+| Every page fails with "Container is not setup", or app install fails with "Base URL misconfigured" | A setup wizard screen was submitted twice | `env/atl-env.sh confluence-6.6.17 reset`, then `npm run setup -- --env confluence:6.6.17` |
 | A step fails | The script prints the failed step and a diagnosis command | Run the printed command |
-
-## Adding a host version
-
-1. Copy a profile in `env/profiles/`. Use a unique `HTTP_PORT` and `DB_PORT`.
-2. Verify the archive URL with an HTTP HEAD request and take `ARCHIVE_MD5` from Atlassian's download feed.
-3. Check the supported Java and PostgreSQL versions on Atlassian's "Supported platforms" page for that version.
-4. Run `npm run setup -- --env <product>:<version>`. If a wizard screen differs, add a class in `env/setup/wizards/`.
-5. Add the host to `tests/targets.ts`. If a host screen differs, add an adapter in `tests/adapters/`.
-6. Run `npm run test -- --env <product>:<version> --repeat-each=10`.
-7. Record verified facts in `docs/notes/hosts.md`.
 
 ## Where things are
 
@@ -176,12 +156,13 @@ Set these environment variables:
 | `env/instances/<profile>/` | Install dir, logs (`home/logs/`), snapshot (git-ignored) |
 | `apps/` | App files to install (git-ignored) |
 | `tests/targets.ts` | Host instances (one Playwright project each) |
-| `tests/setup/` | Login + test space creation, and test space deletion |
-| `tests/adapters/` | Everything host-specific (selectors, URLs, editor actions) |
-| `tests/pages/` | App screens (macro dialog, rendered macro) |
+| `tests/setup/` | Administrator login before the tests |
+| `tests/adapters/` | Everything host-specific (login form, dashboard, user menu): `Confluence6Adapter`, `Confluence9Adapter` |
+| `tests/pages/` | App screens (EasySSO Headers screen) |
 | `tests/fixtures/` | Fixtures and REST helpers (setup/teardown only) |
-| `tests/specs/google-maps-pro/` | The tests and their data |
+| `tests/specs/easysso/` | The tests and their data |
 | `scripts/atl.mjs` | npm command runner (calls `env/atl-env.sh` and Playwright) |
 | `scripts/check-test-rules.mjs` | Selector and API rule check |
-| `docs/notes/` | Verified facts (`hosts.md`, `google-maps-pro.md`) and `open-questions.md` |
+| `docs/notes/` | Verified facts (`hosts.md`, `easysso.md`) and `open-questions.md` |
+| `_reference/` | The previous project (Embed Google Maps Pro), unchanged |
 | `CLAUDE.md` | Rules and decisions for AI-assisted work in this repository |

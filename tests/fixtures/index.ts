@@ -1,17 +1,17 @@
-import { test as base, expect, type PlaywrightWorkerArgs } from '@playwright/test';
+import { test as base, expect, type Page, type PlaywrightWorkerArgs } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createAdapter, type AdapterName, type HostAdapter } from '../adapters/index.js';
 import { ConfluenceRest, credentialsFromEnv, type Credentials } from './rest.js';
 
-export const APP_KEY = 'org.techtime.confluence.plugins.googlemapsembed';
+export const APP_KEY = 'org.techtime.confluence.plugins.easysso';
 
 /** Per-project options, set in playwright.config.ts from tests/targets.ts. */
 export interface SuiteOptions {
   adapterName: AdapterName;
   targetName: string;
   hostVersion: string;
-  /** Same value as baseURL; worker-scoped so worker fixtures (test space) can use it. */
+  /** Same value as baseURL; worker-scoped so worker-scoped fixtures can use it. */
   hostBaseURL: string;
 }
 
@@ -19,15 +19,17 @@ interface TestFixtures {
   adapter: HostAdapter;
   creds: Credentials;
   rest: ConfluenceRest;
-  /** Id of a new, empty page in the worker's test space (created by REST: setup only). */
-  emptyPageId: string;
+  /** A new non-admin user for this test (created by REST: setup only; removed afterwards). */
+  testUser: Credentials;
+  /** Removes all EasySSO header rules before and after the test (REST: setup and teardown only). */
+  cleanEasySsoHeaderRules: void;
+  /**
+   * Opens a page in a new browser context that has no login cookie, and sends `headers` with every
+   * request. This is how a request from behind an authenticating reverse proxy looks to the host.
+   */
+  newAnonymousPage: (headers?: Record<string, string>) => Promise<Page>;
   /** Collects browser console errors and attaches them, plus the product log tail, on failure. */
   failureEvidence: void;
-}
-
-interface WorkerFixtures {
-  /** Key of the run's test space (created by the setup project, deleted by the teardown project). */
-  spaceKey: string;
 }
 
 /** Product log for failure evidence. ATL_LOG_FILE overrides the default local path. */
@@ -49,27 +51,12 @@ function restContext(playwright: PlaywrightWorkerArgs['playwright'], baseURL: st
   return playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
 }
 
-/** File holding the key of the run's test space for a target. */
-export function spaceFile(targetName: string): string {
-  return `.auth/${targetName}.space.json`;
-}
-
 export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' | 'hostVersion'>,
-  WorkerFixtures & Pick<SuiteOptions, 'hostBaseURL' | 'targetName'>>({
-  adapterName: ['confluence-8', { option: true }],
+  Pick<SuiteOptions, 'hostBaseURL' | 'targetName'>>({
+  adapterName: ['confluence-6', { option: true }],
   targetName: ['', { option: true, scope: 'worker' }],
   hostVersion: ['', { option: true }],
   hostBaseURL: ['', { option: true, scope: 'worker' }],
-
-  spaceKey: [
-    async ({ targetName }, use) => {
-      // Created by tests/setup/login.setup.ts, deleted by tests/setup/cleanup.teardown.ts.
-      const file = spaceFile(targetName);
-      if (!existsSync(file)) throw new Error(`${file} not found: the setup project "setup-${targetName}" must run first`);
-      await use((JSON.parse(readFileSync(file, 'utf8')) as { key: string }).key);
-    },
-    { scope: 'worker' },
-  ],
 
   adapter: async ({ adapterName }, use) => {
     await use(createAdapter(adapterName));
@@ -85,11 +72,35 @@ export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' 
     await request.dispose();
   },
 
-  emptyPageId: async ({ rest, spaceKey }, use, testInfo) => {
-    // Titles must be unique in the shared space, also for parallel workers and --repeat-each.
-    const unique = `w${testInfo.workerIndex}r${testInfo.repeatEachIndex} ${randomUUID().slice(0, 8)}`;
-    const title = `${testInfo.title.replace(/[^\w ]/g, '').slice(0, 60)} ${unique}`;
-    await use(await rest.createPage(spaceKey, title));
+  testUser: async ({ rest }, use, testInfo) => {
+    // Unique per test run and repeat, so parallel workers and --repeat-each never share a user.
+    const username = `sso-${testInfo.workerIndex}-${randomUUID().slice(0, 8)}`;
+    const password = randomUUID();
+    await rest.createUser(username, `SSO Test User ${username}`, password);
+    await use({ username, password });
+    await rest.removeUser(username);
+  },
+
+  cleanEasySsoHeaderRules: async ({ rest }, use) => {
+    await rest.clearEasySsoHeaderRules();
+    await use();
+    await rest.clearEasySsoHeaderRules();
+  },
+
+  newAnonymousPage: async ({ browser, baseURL }, use) => {
+    const contexts: Awaited<ReturnType<typeof browser.newContext>>[] = [];
+    await use(async (headers = {}) => {
+      // storageState is cleared explicitly so the project's saved admin login is not used.
+      const context = await browser.newContext({
+        baseURL,
+        locale: 'en-US',
+        storageState: { cookies: [], origins: [] },
+        extraHTTPHeaders: { 'Accept-Language': 'en-US', ...headers },
+      });
+      contexts.push(context);
+      return context.newPage();
+    });
+    for (const c of contexts) await c.close();
   },
 
   failureEvidence: [

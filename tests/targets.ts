@@ -19,23 +19,21 @@ export interface Target {
 
 export const targets: Target[] = [
   {
-    name: 'confluence-8.5.31',
+    name: 'confluence-6.6.17',
     product: 'confluence',
-    version: '8.5.31',
-    adapter: 'confluence-8',
-    baseURLEnv: 'ATL_BASE_URL_CONFLUENCE_8_5_31',
+    version: '6.6.17',
+    adapter: 'confluence-6',
+    baseURLEnv: 'ATL_BASE_URL_CONFLUENCE_6_6_17',
     // 127.0.0.1, not localhost: ::1 is held by wslrelay and never answers (docs/notes/hosts.md).
-    defaultBaseURL: 'http://127.0.0.1:8090',
-    grepInvert: /@confluence-6-only/,
+    defaultBaseURL: 'http://127.0.0.1:8066',
   },
   {
-    name: 'confluence-9.2.26',
+    name: 'confluence-9.5.4',
     product: 'confluence',
-    version: '9.2.26',
+    version: '9.5.4',
     adapter: 'confluence-9',
-    baseURLEnv: 'ATL_BASE_URL_CONFLUENCE_9_2_26',
-    defaultBaseURL: 'http://127.0.0.1:8100',
-    grepInvert: /@confluence-6-only/,
+    baseURLEnv: 'ATL_BASE_URL_CONFLUENCE_9_5_4',
+    defaultBaseURL: 'http://127.0.0.1:8095',
   },
 ];
 

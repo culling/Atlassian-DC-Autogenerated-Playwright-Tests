@@ -2,8 +2,8 @@
 
 This repository holds two things:
 
-1. **Environment scripts** that download, configure and run Atlassian Data Center (DC) host products (Confluence first, Jira later) from the official `.tar.gz` archives.
-2. **Playwright end-to-end (E2E) tests** for TechTime apps running on those hosts. The app under test is **EasySSO for Confluence** (TechTime).
+1. **Environment scripts** that download, configure and run Atlassian Data Center (DC) host products (Confluence and Jira Software) from the official `.tar.gz` archives.
+2. **Playwright end-to-end (E2E) tests** for TechTime apps running on those hosts. The app under test is **EasySSO** (TechTime): EasySSO for Confluence and EasySSO for Jira.
 
 `_reference/` holds the previous project (Embed Google Maps Pro on Confluence 8.5.31 and 9.2.26), moved there unchanged on the user's request (2026-10-27). It has its own `CLAUDE.md`. It is a reference: copy patterns from it, but do not change it unless the user asks.
 
@@ -11,10 +11,10 @@ Read this whole file before doing any task. Follow the rules exactly. If a rule 
 
 **Current status (2026-10-28):**
 
-1. Host profiles working end to end (`up`, tests): `confluence-6.6.17` and `confluence-9.5.4` (added on the user's request, 2026-10-28: "please also get it to test on confluence 9").
-2. App under test: EasySSO 5.2.4 (`apps/confluence.plugins.easysso-5.2.4.obr`), the newest version for Confluence below 10 (6.0.1 – 9.5.4).
-3. Tests: 1 `@smoke` test (HTTP header login). On 6.6.17: 10 consecutive runs passed three times (the third on a fresh `reset` + `up`), and after `restore`. On 9.5.4: 10 consecutive runs passed, the negative copy failed as expected, and it passed after `restore`. The user said: only the HTTP headers test for now.
-4. Not built yet: other hosts for EasySSO (8.x, 9.2), `tests-forge/`, CI (Bitbucket Pipelines).
+1. Host profiles working end to end (`up`, tests): `confluence-6.6.17`, `confluence-9.5.4` (user, 2026-10-28: "please also get it to test on confluence 9"), `jira-8.22.1` and `jira-10.7.4` (user, 2026-10-28: the same EasySSO tests with EasySSO for Jira on Jira 8.22.1, then on the highest Jira version supported by that release).
+2. Apps under test: EasySSO for Confluence 5.2.4 (`apps/confluence.plugins.easysso-5.2.4.obr`, Confluence 6.0.1 – 9.5.4) and EasySSO for Jira 5.2.4 (`apps/jira.plugins.easysso-5.2.4.obr`, Jira 8.22.0 – 10.7.4).
+3. Tests: 1 `@smoke` test (HTTP header login). On 6.6.17: 10 consecutive runs passed three times (the third on a fresh `reset` + `up`), and after `restore`. On 9.5.4, Jira 8.22.1 and Jira 10.7.4: 10 consecutive runs passed, the negative copy failed as expected, and it passed after `restore`; both Jira hosts were built from a clean `reset` + `up`. The user said: only the HTTP headers test for now.
+4. Not built yet: other hosts for EasySSO (Confluence 8.x and 9.2), `tests-forge/`, CI (Bitbucket Pipelines). Jira versions between 8.22.1 and 10.7.4: not for now (user, 2026-10-28; may be reviewed later together with automating configuration).
 5. Open questions: `docs/notes/open-questions.md`. User commands: `README.md`.
 
 ---
@@ -62,11 +62,13 @@ When a fact is not known (a URL, a setting name, a version range), do not guess.
 │   ├── lib/common.sh              # helper shell functions sourced by atl-env.sh
 │   ├── profiles/
 │   │   ├── confluence-6.6.17.env  # one file per host version
-│   │   └── confluence-9.5.4.env
+│   │   ├── confluence-9.5.4.env
+│   │   ├── jira-8.22.1.env
+│   │   └── jira-10.7.4.env
 │   ├── setup/                     # setup wizard automation (own Playwright config)
 │   │   ├── playwright.config.ts
-│   │   ├── confluence-setup.setup.ts
-│   │   └── wizards/               # SetupWizard interface; Confluence8Wizard (base), Confluence6Wizard, Confluence9Wizard (extend 8)
+│   │   ├── host-setup.setup.ts
+│   │   └── wizards/               # SetupWizard interface; Confluence8Wizard (base), Confluence6Wizard, Confluence9Wizard (extend 8); JiraWizard, Jira10Wizard (extends JiraWizard)
 │   ├── downloads/                 # cached archives (git-ignored)
 │   └── instances/                 # install dir, logs, snapshot per profile (git-ignored)
 ├── apps/                          # app .jar/.obr files to install (git-ignored)
@@ -74,7 +76,7 @@ When a fact is not known (a URL, a setting name, a version range), do not guess.
 │   ├── targets.ts                 # host instances: one Playwright project each, base URL overridable
 │   ├── setup/
 │   │   └── login.setup.ts         # per target, before tests: log in as admin (.auth/<target>.json)
-│   ├── adapters/                  # HostAdapter interface; Confluence6Adapter, Confluence9Adapter (extends 6)
+│   ├── adapters/                  # HostAdapter interface; Confluence6Adapter, Confluence9Adapter (extends 6); JiraAdapter, Jira10Adapter (extends JiraAdapter)
 │   ├── pages/                     # page objects for app screens (host-independent)
 │   ├── fixtures/                  # fixtures; REST helpers for setup/teardown ONLY
 │   └── specs/
@@ -103,7 +105,7 @@ Git-ignore: `node_modules/`, `env/downloads/`, `env/instances/`, `env/setup/test
 
 One script that works for every Confluence version (and later Jira) without code changes. All version differences come from the profile file.
 
-Current profiles (verified): `confluence-6.6.17` (port 8066, DB port 5436) and `confluence-9.5.4` (port 8095, DB port 5437). The `_reference` profiles use ports 8090/8100 and 5433/5434, so both projects can run at the same time.
+Current profiles (verified): `confluence-6.6.17` (port 8066, DB port 5436), `confluence-9.5.4` (8095, 5437), `jira-8.22.1` (8822, 5438) and `jira-10.7.4` (8107, 5439). The `_reference` profiles use ports 8090/8100 and 5433/5434, so both projects can run at the same time.
 
 **Docker object names come from the profile name** (`atl-<profile>-app`, `-db`, `-home`, `-pgdata`). Never create a profile here with the same name as a `_reference` profile (`confluence-8.5.31`, `confluence-9.2.26`): both projects would use the same containers and volumes, and `reset` here would delete the `_reference` instance's data. This is why Confluence 9 is tested with 9.5.4 (verified 2026-10-28).
 
@@ -142,19 +144,20 @@ Each profile is a plain `KEY=value` file sourced by the script. See `env/profile
 
 1. **Idempotent.** Running any command twice must not break anything. Example: `download` skips an existing valid archive.
 2. **Fail loudly.** `set -euo pipefail`. Every failure prints which step failed and the next command to run for diagnosis.
-3. **Java per profile.** The product runs inside a Docker container from `JAVA_IMAGE` (`eclipse-temurin:<JAVA_MAJOR>-jdk`), with the install dir, home dir and logs mounted. No local-JDK fallback; ask the user before adding one. Verified: Confluence 6.6 supports Java 1.8 (AdoptOpenJDK 8 from 6.6.12); profile uses Temurin 8. Confluence 9.5 supports Java 21 (17 deprecated); profile uses Temurin 21. For a new profile, check Atlassian's "Supported platforms" page for that version and record the result in `docs/notes/hosts.md`.
-4. **Database.** PostgreSQL in Docker, one container per profile, on the profile's `DB_PORT` (published on `127.0.0.1` only). Verified: 6.6 supports PostgreSQL 9.2–9.6 (profile uses 9.6); 9.5 supports PostgreSQL 16 (15 deprecated; profile uses 16). Do not use the embedded evaluation database unless the user approves it.
-5. **Health check.** After `start`, poll `http://127.0.0.1:<HTTP_PORT><CONTEXT_PATH>/status` until it reports `{"state":"RUNNING"}` or `{"state":"FIRST_RUN"}`, with a timeout (15 minutes). Verified on 6.6.17 and 9.5.4.
+3. **Java per profile.** The product runs inside a Docker container from `JAVA_IMAGE` (`eclipse-temurin:<JAVA_MAJOR>-jdk`), with the install dir, home dir and logs mounted. No local-JDK fallback; ask the user before adding one. Verified: Confluence 6.6 supports Java 1.8 (AdoptOpenJDK 8 from 6.6.12); profile uses Temurin 8. Confluence 9.5 supports Java 21 (17 deprecated); profile uses Temurin 21. Jira 8.22 supports Java 8 and 11; profile uses Temurin 11. Jira 10.7 supports Java 21 (17 deprecated); profile uses Temurin 21. For a new profile, check Atlassian's "Supported platforms" page for that version and record the result in `docs/notes/hosts.md`.
+4. **Database.** PostgreSQL in Docker, one container per profile, on the profile's `DB_PORT` (published on `127.0.0.1` only). Verified: 6.6 supports PostgreSQL 9.2–9.6 (profile uses 9.6); 9.5 supports PostgreSQL 16 (15 deprecated; profile uses 16). Jira 8.22 supports PostgreSQL 10–13 (profile uses 13); Jira 10.7 supports 16 (12–15 deprecated; profile uses 16). Do not use the embedded evaluation database unless the user approves it.
+5. **Health check.** After `start`, poll `http://127.0.0.1:<HTTP_PORT><CONTEXT_PATH>/status` until it reports `{"state":"RUNNING"}` or `{"state":"FIRST_RUN"}`, with a timeout (15 minutes). Verified on all four profiles. **Jira reports FIRST_RUN before its plugin system has started** (10.7.4: pages answer HTTP 503 for about 1 minute after FIRST_RUN), so `JiraWizard` waits for a real wizard page before its first step.
 6. **No secrets in the repo.** Licence keys are read from environment variables or `.env.local` (git-ignored). Never write a licence key into a committed file.
 7. **Reset must be complete.** After `reset` + first-time setup, every run starts from the same data.
 8. **Use `127.0.0.1`, never `localhost`.** On this Windows machine `localhost` resolves to `::1`, which is held by `wslrelay` and never answers. Ports are published on `127.0.0.1` only. The server base URL is taken from the address used for the setup wizard, so the wizard must also use `127.0.0.1`.
 9. **JVM options go in `CATALINA_OPTS`.** Profile-specific options go in `EXTRA_JVM_OPTS`.
-10. **The product container holds no state.** Install dir (bind mount), home dir (Docker volume) and logs (bind mount to `env/instances/<profile>/home/logs/`) are mounted, so `start` re-creates a stopped container to apply profile changes.
+10. **The product container holds no state.** Install dir (bind mount), home dir (Docker volume) and logs (bind mount to `env/instances/<profile>/home/logs/`, Jira: `home/log/`) are mounted, so `start` re-creates a stopped container to apply profile changes.
+11. **Product differences in one place.** `PRODUCT` (`confluence` | `jira`) in the profile selects the start script, Tomcat port, log directory and the `configure_<product>_files` function (`env/lib/common.sh`, `env/atl-env.sh`). Version differences stay in the profile. Jira specifics: home from the `JIRA_HOME` environment variable; `configure` writes `dbconfig.xml` (database connection, so the wizard has no database screen) and `jira-config.properties` (`jira.websudo.is.disabled = true`) into the home volume if they are missing; the product log is `<home>/log/atlassian-jira.log`.
 
 ### 4.5 Licences
 
 1. Use Atlassian **timebomb licences** from https://developer.atlassian.com/platform/marketplace/timebomb-licenses-for-testing-server-apps/
-2. In use (user said, 2026-10-27): "10 user Confluence Data Center license, expires in 3 hours" (host, `.env.local` variable `ATL_LICENSE_CONFLUENCE_DC`) and "10 user Data Center app license, expires in 3 hours" (app, `ATL_LICENSE_APP_DC`). Both were accepted on 6.6.17 and 9.5.4 (app: EasySSO 5.2.4).
+2. In use (user said, 2026-10-27): "10 user Confluence Data Center license, expires in 3 hours" (host, `.env.local` variable `ATL_LICENSE_CONFLUENCE_DC`) and "10 user Data Center app license, expires in 3 hours" (app, `ATL_LICENSE_APP_DC`). Both were accepted on 6.6.17 and 9.5.4 (app: EasySSO 5.2.4). Jira: "10 user Jira Software Data Center license, expires in 3 hours" (`ATL_LICENSE_JIRA_DC`); the user asked Claude to take it from the timebomb page and add it to `.env.local` (2026-10-28). Accepted on 8.22.1 and 10.7.4; the app licence key is accepted by EasySSO for Jira too.
 3. Known limits:
     - **On Confluence 6.6 a Data Center licence requires a cluster** (not on 9.5). The setup creates a one-node cluster (section 4.7). Do not switch to a Server licence without asking (EasySSO 5.2.4 is listed for Data Center only).
     - The licences expire after about 3 hours; the site then becomes read-only. On 9.2.26 `restore` reset this; on 6.6.17 not verified yet. Plan for `restore` before each run, not long-lived instances.
@@ -173,7 +176,7 @@ App files: find the version and its compatibility range with the Marketplace RES
 
 ### 4.7 First-time setup (setup wizard)
 
-The `.tar.gz` install starts in the setup wizard (state FIRST_RUN). The wizard is automated with Playwright in `env/setup/confluence-setup.setup.ts` (own config: `env/setup/playwright.config.ts`), not with shell scraping. It is part of the environment, not of the test suite (decision 2.8). `env/atl-env.sh <profile> up` runs all steps:
+The `.tar.gz` install starts in the setup wizard (state FIRST_RUN). The wizard is automated with Playwright in `env/setup/host-setup.setup.ts` (one file for every product; own config: `env/setup/playwright.config.ts`), not with shell scraping. It is part of the environment, not of the test suite (decision 2.8). `env/atl-env.sh <profile> up` runs all steps:
 
 1. Choose production installation (not evaluation). On 6.6: skip "Get add-ons".
 2. Enter the host licence from the env var.
@@ -188,19 +191,26 @@ The `.tar.gz` install starts in the setup wizard (state FIRST_RUN). The wizard i
 
 Wizard screens differ between host versions. Put the differences in a `SetupWizard` class in `env/setup/wizards/` (selected by the profile's `SETUP_WIZARD`), not in `if` branches inside the setup file. The wizard is driven by the current URL in a loop, because some screens are only saved together with the next one. Verified screens: `docs/notes/hosts.md`.
 
-Current classes: `Confluence8Wizard` (the 8.5 flow, kept as the base class for login, websudo and onboarding), `Confluence6Wizard` (6.6.17) and `Confluence9Wizard` (9.x: 8.5 screens, new login page; verified on 9.2.26 in `_reference` and on 9.5.4).
+Current classes: `Confluence8Wizard` (the 8.5 flow, kept as the base class for login, websudo and onboarding), `Confluence6Wizard` (6.6.17), `Confluence9Wizard` (9.x: 8.5 screens, new login page; verified on 9.2.26 in `_reference` and on 9.5.4), `JiraWizard` (8.22.1) and `Jira10Wizard` (10.7.4: new login page, a different set of plugins to disable).
+
+Jira wizard rules (verified, `docs/notes/hosts.md`):
+
+1. Jira answers a form POST with the next screen, so the URL can still name the previous screen. `JiraWizard` identifies screens by URL **and heading**, and after a submit waits until one of them changes.
+2. "Onboarding" for Jira means everything that covers the UI on a new instance: the welcome flow, help tips, health check flags, the "perform a re-index" flag, and on 10.x the Instance Optimizer flags. The setup disables the plugins in `pluginsToDisable` and runs a re-index. The onboarding plugin stays enabled (on Jira 10, disabling it makes the welcome page for a new header-login user answer HTTP 500); both Jira profiles turn the welcome flow off with `-Datlassian.darkfeature.jira.onboarding.feature.disabled=true` (verified on 8.22.1 and 10.7.4; user, 2026-10-28: turn off onboarding if that works). The 10.7.4 "Try dark theme" tip is ignored (user, 2026-10-28).
+3. The browser uses `timezoneId: 'UTC'`, the same as the hosts; otherwise Jira shows a "time zone does not match" flag over the page.
 
 **Submit each wizard form exactly once.** On 6.6.17 a normal Playwright click timed out although the form had been submitted, and submitting a screen twice left a broken instance ("Container is not setup", then base URL `<null>`). `Confluence6Wizard` uses one forced click per screen and then waits for the URL. If a setup run fails in the middle, use `reset` and run `up` again instead of resuming by hand.
 
 ---
 
-## 5. App under test: EasySSO for Confluence (TechTime)
+## 5. App under test: EasySSO for Confluence and EasySSO for Jira (TechTime)
 
 ### 5.1 Known facts
 
 - Marketplace: https://marketplace.atlassian.com/apps/1212583 (app id 1212583).
-- App key: `org.techtime.confluence.plugins.easysso`.
-- App file under test: `apps/confluence.plugins.easysso-5.2.4.obr`, Data Center, Confluence 6.0.1 – 9.5.4 (Marketplace REST, 2026-10-27). Versions 5.3.x and later need Confluence 10.
+- App keys: `org.techtime.confluence.plugins.easysso` (Marketplace app 1212583) and `org.techtime.jira.plugins.easysso` (app 1212581). The key per host is `appKey` in `tests/targets.ts`.
+- App files under test: `apps/confluence.plugins.easysso-5.2.4.obr` (Confluence DC 6.0.1 – 9.5.4; 5.3.x and later need Confluence 10) and `apps/jira.plugins.easysso-5.2.4.obr` (Jira DC 8.22.0 – 10.7.4; 5.3.x need Jira 11). Marketplace REST, 2026-10-27/28.
+- The Headers screen files (`headers/customauth-admin.js`, `.vm`) are byte-for-byte identical in both apps, so the page object `EasySsoHeadersConfig` and the spec are shared.
 - Single sign-on (SSO) app with authenticators for NTLM/Kerberos, SAML, X.509 and **HTTP headers** ("Custom Authentication").
 - Admin: `/plugins/servlet/easysso/admin`; Headers screen `/plugins/servlet/easysso/admin/headers`; rules REST `rest/easysso/1.0/headers` (used only for teardown).
 - **HTTP header login** (term): a reverse proxy authenticates the user and passes the username in an HTTP header; EasySSO logs the request in as that user when a rule with "Get Username" matches the header name.
@@ -214,7 +224,7 @@ Record every new fact in `docs/notes/easysso.md`. How to discover: read the plug
 
 `@smoke` (user said: only the HTTP headers test for now, 2026-10-27):
 
-1. `tests/specs/easysso/http-headers.spec.ts`: the admin adds a header rule with "Get Username" in the UI; a browser that sends the header is logged in as the user named in it; a browser without the header gets the login page. Passes 10 consecutive runs (three times) on 6.6.17 and on 9.5.4 (2026-10-28).
+1. `tests/specs/easysso/http-headers.spec.ts`: the admin adds a header rule with "Get Username" in the UI; a browser that sends the header is logged in as the user named in it; a browser without the header is not logged in (`adapter.loginPrompt`: the Confluence login form, the Jira header "Log In" link). Passes 10 consecutive runs on all four hosts (2026-10-28).
 
 Not covered yet (ask the user first): `docs/notes/open-questions.md` item 5.
 
@@ -222,7 +232,7 @@ Not covered yet (ask the user first): `docs/notes/open-questions.md` item 5.
 
 1. **Header rules and other EasySSO settings are site-wide.** Every test that changes them must restore the empty state in setup and teardown (fixture `cleanEasySsoHeaderRules`). The suite runs with `workers: 1`.
 2. A request "from behind the proxy" is simulated by a new browser context with no cookies and `extraHTTPHeaders` (fixture `newAnonymousPage`). Do not reuse the admin's logged-in context for it.
-3. Test users are created per test (fixture `testUser`, JSON-RPC `addUser`, removed afterwards), with unique names.
+3. Test users are created per test (fixture `testUser`, removed afterwards), with unique names. Confluence: JSON-RPC `addUser` (`ConfluenceRest`); Jira: `POST /rest/api/2/user` with `applicationKeys: ["jira-software"]` (`JiraRest`). `createRest(product, ...)` picks the class from the target's `product`.
 4. Do not test SAML, NTLM/Kerberos or X.509 without asking: they need external systems (an identity provider, a domain controller, client certificates).
 
 ---
@@ -234,17 +244,17 @@ Not covered yet (ask the user first): `docs/notes/open-questions.md` item 5.
 1. **Specs** (`tests/specs/`): scenario steps and assertions. No host-specific code. No raw selectors.
 2. **Page objects** (`tests/pages/`): one class per app screen or dialog (for example `EasySsoHeadersConfig`). Use `data-testid` where the app markup has it; otherwise role + accessible name.
 3. **Adapters** (`tests/adapters/`): everything that differs between host products or versions:
-    - login form, dashboard, the logged-in user menu
+    - login form, dashboard, the logged-in user menu, the "not logged in" prompt
     - Every adapter implements the same TypeScript interface (`HostAdapter`). Add methods only when a test needs them, and verify their selectors on the host first.
-    - Current adapters: `Confluence6Adapter` (6.6.17) and `Confluence9Adapter` (9.5.4; only the login form differs). Selected by `adapter` in `tests/targets.ts`. The 8.5/9.2 adapters (editor, macros, UPM, PDF) are in `_reference/tests/adapters/`.
+    - Current adapters: `Confluence6Adapter` (6.6.17), `Confluence9Adapter` (9.5.4; only the login form differs), `JiraAdapter` (8.22.1) and `Jira10Adapter` (10.7.4; only the login form differs). Selected by `adapter` in `tests/targets.ts`. The 8.5/9.2 adapters (editor, macros, UPM, PDF) are in `_reference/tests/adapters/`.
     - Setup wizard differences are NOT here; they live in `env/setup/wizards/` (decision 2.8).
-4. **Fixtures** (`tests/fixtures/`): REST helpers for setup/teardown, a test user per test, header rule cleanup, new anonymous pages with extra headers, failure evidence, and creation of the adapter from the Playwright project config.
+4. **Fixtures** (`tests/fixtures/`): REST helpers for setup/teardown (one class per product, chosen by the target's `product`), a test user per test, header rule cleanup, new anonymous pages with extra headers, failure evidence, and creation of the adapter from the Playwright project config.
 
 ### 6.2 Playwright config
 
-1. One Playwright **project per host version**, listed in `tests/targets.ts` and named after the profile (`confluence-6.6.17`, `confluence-9.5.4`). Each sets `baseURL`, `hostBaseURL` and an `adapterName` option. The base URL can be overridden with the environment variable named in the target (`ATL_BASE_URL_CONFLUENCE_6_6_17`, `ATL_BASE_URL_CONFLUENCE_9_5_4`).
+1. One Playwright **project per host version**, listed in `tests/targets.ts` and named after the profile (`confluence-6.6.17`, `confluence-9.5.4`, `jira-8.22.1`, `jira-10.7.4`). Each sets `baseURL`, `hostBaseURL`, `adapterName`, `product` and `appKey`. The base URL can be overridden with the environment variable named in the target (`ATL_BASE_URL_CONFLUENCE_6_6_17`, `ATL_BASE_URL_CONFLUENCE_9_5_4`, `ATL_BASE_URL_JIRA_8_22_1`, `ATL_BASE_URL_JIRA_10_7_4`).
 2. A setup project per host (`tests/setup/login.setup.ts`) logs in once and saves `storageState` to `.auth/<target>.json`. Test projects depend on it.
-3. `use: { screenshot: 'only-on-failure', trace: 'retain-on-failure', video: 'off', actionTimeout: 20_000, navigationTimeout: 60_000, locale: 'en-US' }`. **`workers: 1`** (section 5.4), test timeout 90 s. Wait for URL changes with `waitUntil: 'commit'`.
+3. `use: { screenshot: 'only-on-failure', trace: 'retain-on-failure', video: 'off', actionTimeout: 20_000, navigationTimeout: 60_000, locale: 'en-US', timezoneId: 'UTC' }`. **`workers: 1`** (section 5.4), test timeout 90 s. Wait for URL changes with `waitUntil: 'commit'`.
 4. Reporters: `html` (open: 'never'), `junit`, `list`.
 5. `forbidOnly: !!process.env.CI`. Retries: 0 locally, at most 1 in CI. A test that only passes on retry is reported as flaky and must be fixed.
 6. Tests that apply to one host only: tag (for example `@confluence-6-only`) and filter with `grep` / `grepInvert` per project. Never `if (host === ...)` inside a spec.
@@ -292,7 +302,7 @@ On failure, attach to the test result (implemented by the automatic `failureEvid
 
 1. Host target name and version, and the app version (read from UPM REST when the test fails).
 2. Browser console errors (collected during the test, main page only).
-3. The last 200 lines of the product log: `env/instances/<profile>/home/logs/atlassian-confluence.log`, or the file in `ATL_LOG_FILE` when the environment is elsewhere.
+3. The last 200 lines of the product log: `env/instances/<profile>/home/logs/atlassian-confluence.log` (Confluence) or `env/instances/<profile>/home/log/atlassian-jira.log` (Jira), or the file in `ATL_LOG_FILE` when the environment is elsewhere.
 
 ---
 

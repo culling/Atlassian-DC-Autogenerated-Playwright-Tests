@@ -24,7 +24,7 @@ export class Confluence6Adapter implements HostAdapter {
     await test.step('Open the dashboard', async () => {
       await page.goto('');
       // Either the logged-in header (user menu) or the login form, depending on who the request is from.
-      await expect(page.locator('#user-menu-link').or(this.loginForm(page))).toBeVisible();
+      await expect(page.locator('#user-menu-link').or(this.loginPrompt(page))).toBeVisible();
     });
   }
 
@@ -33,7 +33,7 @@ export class Confluence6Adapter implements HostAdapter {
     return page.locator(`#user-menu-link[data-username="${username}"]`);
   }
 
-  loginForm(page: Page): Locator {
+  loginPrompt(page: Page): Locator {
     return page.locator(this.loginFields.username);
   }
 }

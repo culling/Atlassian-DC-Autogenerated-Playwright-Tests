@@ -16,3 +16,8 @@ Each item: the question — what would resolve it.
 - Which EasySSO version: 5.2.4, the newest for Confluence below 10 (6.0.1 – 9.5.4) — Marketplace REST, and the user expected 5.2.4, 2026-10-27.
 - curl error 23 on `download`: caused by `MSYS_NO_PATHCONV=1` with Git's Windows `curl.exe`; fixed with `hostpath` — 2026-10-27.
 - Does the DC timebomb licence work on 6.6.17? Yes, with a one-node cluster — 2026-10-27.
+- Which EasySSO for Jira version and hosts: 5.2.4 (Jira DC 8.22.0 – 10.7.4); hosts 8.22.1 (user's choice) and 10.7.4 (highest) — Marketplace REST and user, 2026-10-28.
+- Jira 10.7.4 "Try dark theme" tip: probably from the Atlassian platform; ignore it, or close it and ignore it — user said, 2026-10-28.
+- Onboarding on Jira 8.22.1 with the system property: works (a new user lands on the dashboard; without the property, on `/secure/WelcomeToJIRA.jspa`). Both Jira profiles now use the property, and the onboarding plugin stays enabled on both — the user asked for it if it works, 2026-10-28.
+- Jira versions between 8.22.1 and 10.7.4: not for now. The user may review this later, probably together with automating configuration (likely as troubleshooting) — user said, 2026-10-28.
+- Jira host licence: `ATL_LICENSE_JIRA_DC` ("10 user Jira Software Data Center license"), added to `.env.local` on the user's request; accepted on 8.22.1 and 10.7.4 — 2026-10-28.

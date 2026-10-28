@@ -30,9 +30,26 @@ load_profile() {
   # shellcheck disable=SC1090
   . "$f"
   set +a
+  # Product differences (not version differences: those are in the profile).
+  case "$PRODUCT" in
+    confluence)
+      START_SCRIPT=bin/start-confluence.sh
+      APP_PORT_IN_CT=8090
+      LOG_SUBDIR=logs
+      LOG_FILE_NAME=atlassian-confluence.log
+      ;;
+    jira)
+      START_SCRIPT=bin/start-jira.sh
+      APP_PORT_IN_CT=8080
+      LOG_SUBDIR=log
+      LOG_FILE_NAME=atlassian-jira.log
+      ;;
+    *) fail "unknown PRODUCT '$PRODUCT' in $f" "grep PRODUCT $f" ;;
+  esac
   INSTANCE_DIR="$REPO_ROOT/env/instances/$PROFILE"
   INSTALL_DIR="$INSTANCE_DIR/install"
-  LOGS_DIR="$INSTANCE_DIR/home/logs"
+  # Product log directory inside the home dir, bind-mounted here so the log can be read from the host.
+  LOGS_DIR="$INSTANCE_DIR/home/$LOG_SUBDIR"
   SNAPSHOT_DIR="$INSTANCE_DIR/snapshot"
   ARCHIVE_FILE="$REPO_ROOT/env/downloads/$(basename "$ARCHIVE_URL")"
   # 127.0.0.1, not localhost: on this Windows machine localhost resolves to ::1 first, and ::1 is
@@ -44,8 +61,8 @@ load_profile() {
   APP_CT="atl-$PROFILE-app"
   HOME_VOL="atl-$PROFILE-home"
   DB_VOL="atl-$PROFILE-pgdata"
-  APP_HOME_IN_CT=/var/atlassian/application-data/confluence
-  APP_INSTALL_IN_CT=/opt/atlassian/confluence
+  APP_HOME_IN_CT=/var/atlassian/application-data/$PRODUCT
+  APP_INSTALL_IN_CT=/opt/atlassian/$PRODUCT
 }
 
 require_docker() {

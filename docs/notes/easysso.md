@@ -1,4 +1,4 @@
-# EasySSO for Confluence — app facts
+# EasySSO for Confluence and Jira — app facts
 
 Format: fact — how verified — date.
 
@@ -37,6 +37,17 @@ Documentation: https://www.techtime-initiative.com/space/EasySSO/4980915/EasySSO
 1. Installed through UPM REST, enabled, DC app timebomb licence valid — `install-app`, 2026-10-28.
 2. Same Headers screen and REST endpoint as on 6.6.17; the page object works unchanged — the test, 2026-10-28.
 3. Header login with "Get Username" on works; with it off, the header does not log anyone in (temporary copy of the test fails at "user menu visible") — 2026-10-28.
+
+## EasySSO for Jira
+
+1. Marketplace app id 1212581, key `org.techtime.jira.plugins.easysso`, name "EasySSO for Jira (Kerberos/NTLM/HTTP headers/SAML SSO)" — Marketplace REST — 2026-10-28.
+2. Version **5.2.4** (released 2026-09-29): Jira Data Center **8.22.0 – 10.7.4**. The 5.3.x versions need Jira 11.0.0 – 11.3.12 — Marketplace REST `/rest/2/addons/org.techtime.jira.plugins.easysso/versions` — 2026-10-28. The user expected 5.2.4 — user said, 2026-10-28.
+3. Download: `https://marketplace.atlassian.com/download/apps/1212581/version/5002004005`, 29078012 bytes, MD5 `481bd97f9a90d29db5eb3ff4b2d9392e`. Saved as `apps/jira.plugins.easysso-5.2.4.obr` (git-ignored) — 2026-10-28.
+4. Same servlets as the Confluence app (admin `/plugins/servlet/easysso/admin*`), same REST path (`<rest path="/easysso" version="1.0">`, `rest/easysso/1.0/headers`). `headers/customauth-admin.js` and `customauth-admin.vm` are byte-for-byte identical to the Confluence 5.2.4 files (`cmp`), so the page object `EasySsoHeadersConfig` is shared — 2026-10-28.
+5. On Jira 8.22.1: installed through UPM REST, enabled, DC app timebomb licence valid. Headers screen title "Custom Authentication - Jira", in the Jira admin layout (sidebar "TECHTIME APPS > EasySSO") — 2026-10-28.
+6. On Jira 8.22.1: header login with "Get Username" on logs the header's user in (`#header-details-user-fullname[data-username]`); with it off, it does not (temporary copy of the test fails at "user menu visible"); without the header, the dashboard shows the login gadget — 2026-10-28.
+7. On Jira 10.7.4: the same results as item 6 (installed and licensed through UPM; header login works; the negative copy fails at "user menu visible"). Without the header the dashboard has no login gadget, only the header "Log In" link — 2026-10-28.
+8. A new user who logs in by header is treated like any first login: Jira's onboarding redirect applies to them (10.7.4: `/secure/WelcomeToJIRASoftware.jspa`). The environment turns onboarding off (hosts.md, Jira 10.7.4 item 11) — 2026-10-28.
 
 ## How the test uses these facts
 

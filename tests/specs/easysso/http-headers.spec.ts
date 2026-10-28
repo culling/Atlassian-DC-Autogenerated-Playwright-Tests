@@ -19,13 +19,13 @@ test('a header rule with "Get Username" logs in the user named in the header @sm
       const withHeader = await newAnonymousPage({ [USERNAME_HEADER]: testUser.username });
       await adapter.openDashboard(withHeader);
       await expect(adapter.userMenu(withHeader, testUser.username)).toBeVisible();
-      await expect(adapter.loginForm(withHeader)).toBeHidden();
+      await expect(adapter.loginPrompt(withHeader)).toBeHidden();
     });
 
-    await test.step('A browser without the header gets the login page', async () => {
+    await test.step('A browser without the header is not logged in (sees the login prompt)', async () => {
       const withoutHeader = await newAnonymousPage();
       await adapter.openDashboard(withoutHeader);
-      await expect(adapter.loginForm(withoutHeader)).toBeVisible();
+      await expect(adapter.loginPrompt(withoutHeader)).toBeVisible();
       await expect(adapter.userMenu(withoutHeader, testUser.username)).toBeHidden();
     });
   });

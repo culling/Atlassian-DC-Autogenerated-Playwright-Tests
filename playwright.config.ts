@@ -27,13 +27,23 @@ export default defineConfig<SuiteOptions>({
     actionTimeout: 20_000,
     navigationTimeout: 60_000,
     locale: 'en-US',
+    // Same time zone as the hosts (UTC): otherwise Jira shows a "time zone does not match" flag over the page.
+    timezoneId: 'UTC',
     extraHTTPHeaders: { 'Accept-Language': 'en-US' },
   },
   projects: targets.flatMap((t) => [
     {
       name: `setup-${t.name}`,
       testMatch: /setup[\\/].*\.setup\.ts/,
-      use: { baseURL: baseURLOf(t), hostBaseURL: baseURLOf(t), adapterName: t.adapter, targetName: t.name, hostVersion: t.version },
+      use: {
+        baseURL: baseURLOf(t),
+        hostBaseURL: baseURLOf(t),
+        adapterName: t.adapter,
+        targetName: t.name,
+        hostVersion: t.version,
+        product: t.product,
+        appKey: t.appKey,
+      },
     },
     {
       name: t.name,
@@ -46,6 +56,8 @@ export default defineConfig<SuiteOptions>({
         adapterName: t.adapter,
         targetName: t.name,
         hostVersion: t.version,
+        product: t.product,
+        appKey: t.appKey,
         storageState: `.auth/${t.name}.json`,
       },
     },

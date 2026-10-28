@@ -14,6 +14,9 @@ export interface HostAdapter {
   openDashboard(page: Page): Promise<void>;
   /** The header user menu of the logged-in user `username` (visible only when that user is logged in). */
   userMenu(page: Page, username: string): Locator;
-  /** The host's login form (visible when nobody is logged in). */
-  loginForm(page: Page): Locator;
+  /**
+   * What the host shows a visitor who is not logged in, on the page openDashboard opens:
+   * the login form (Confluence) or the header "Log In" link (Jira).
+   */
+  loginPrompt(page: Page): Locator;
 }

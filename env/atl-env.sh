@@ -63,7 +63,7 @@ cmd_download() {
 
 cmd_install() {
   [ -f "$ARCHIVE_FILE" ] || fail "archive missing: $ARCHIVE_FILE" "env/atl-env.sh $PROFILE download"
-  if [ -f "$INSTALL_DIR/bin/start-confluence.sh" ]; then
+  if [ -f "$INSTALL_DIR/$START_SCRIPT" ]; then
     log "already installed: $INSTALL_DIR"
     return
   fi
@@ -75,9 +75,7 @@ cmd_install() {
   log "install complete"
 }
 
-cmd_configure() {
-  [ -f "$INSTALL_DIR/bin/setenv.sh" ] || fail "product not installed" "env/atl-env.sh $PROFILE install"
-
+configure_confluence_files() {
   # 1. JVM memory. setenv.sh ships with a fixed "-Xms1024m -Xmx1024m" line.
   sed -i -E "s/^CATALINA_OPTS=\"-Xms[0-9]+[mMgG] -Xmx[0-9]+[mMgG] /CATALINA_OPTS=\"-Xms${JVM_MIN_MEM} -Xmx${JVM_MAX_MEM} /" \
     "$INSTALL_DIR/bin/setenv.sh"
@@ -94,6 +92,62 @@ cmd_configure() {
   # 3. Context path.
   sed -i -E "s#<Context path=\"[^\"]*\" docBase=\"../confluence\"#<Context path=\"${CONTEXT_PATH}\" docBase=\"../confluence\"#" \
     "$INSTALL_DIR/conf/server.xml"
+}
+
+configure_jira_files() {
+  # 1. JVM memory. setenv.sh has JVM_MINIMUM_MEMORY / JVM_MAXIMUM_MEMORY lines.
+  sed -i -E "s/^JVM_MINIMUM_MEMORY=\"[^\"]*\"/JVM_MINIMUM_MEMORY=\"${JVM_MIN_MEM}\"/; s/^JVM_MAXIMUM_MEMORY=\"[^\"]*\"/JVM_MAXIMUM_MEMORY=\"${JVM_MAX_MEM}\"/" \
+    "$INSTALL_DIR/bin/setenv.sh"
+  grep -q "^JVM_MAXIMUM_MEMORY=\"${JVM_MAX_MEM}\"" "$INSTALL_DIR/bin/setenv.sh" \
+    || fail "could not set JVM memory in setenv.sh" "grep -n JVM_ $INSTALL_DIR/bin/setenv.sh"
+
+  # 2. Home directory: set with the JIRA_HOME environment variable in start_app (setenv.sh reads it).
+
+  # 3. Context path.
+  sed -i -E "s#<Context path=\"[^\"]*\" docBase=\"\\\$\{catalina.home\}/atlassian-jira\"#<Context path=\"${CONTEXT_PATH}\" docBase=\"\${catalina.home}/atlassian-jira\"#" \
+    "$INSTALL_DIR/conf/server.xml"
+  grep -q "<Context path=\"${CONTEXT_PATH}\" docBase=" "$INSTALL_DIR/conf/server.xml" \
+    || fail "could not set the context path in server.xml" "grep -n Context $INSTALL_DIR/conf/server.xml"
+}
+
+# Writes a file into the home volume if it does not exist yet. Content comes from stdin.
+write_home_file_once() {
+  docker run --rm -i -v "$HOME_VOL:/data" "$JAVA_IMAGE" sh -c "[ -f '/data/$1' ] && cat >/dev/null || cat > '/data/$1'" \
+    || fail "could not write $1 into $HOME_VOL" "docker volume inspect $HOME_VOL"
+}
+
+configure_jira_home() {
+  # Database connection: Jira reads dbconfig.xml from the home dir, so the setup wizard skips its
+  # database screen. Format: Atlassian "Connecting Jira applications to PostgreSQL".
+  write_home_file_once dbconfig.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<jira-database-config>
+  <name>defaultDS</name>
+  <delegator-name>default</delegator-name>
+  <database-type>postgres72</database-type>
+  <schema-name>public</schema-name>
+  <jdbc-datasource>
+    <url>jdbc:postgresql://${DB_CT}:5432/${DB_NAME}</url>
+    <driver-class>org.postgresql.Driver</driver-class>
+    <username>${DB_USER}</username>
+    <password>${DB_PASSWORD}</password>
+    <pool-min-size>20</pool-min-size>
+    <pool-max-size>20</pool-max-size>
+    <pool-max-wait>30000</pool-max-wait>
+    <validation-query>select 1</validation-query>
+    <pool-test-while-idle>true</pool-test-while-idle>
+  </jdbc-datasource>
+</jira-database-config>
+EOF
+  # Secure administrator sessions (websudo) off: test instances only. Jira has no UI setting for it.
+  write_home_file_once jira-config.properties <<'EOF'
+jira.websudo.is.disabled = true
+EOF
+}
+
+cmd_configure() {
+  [ -f "$INSTALL_DIR/bin/setenv.sh" ] || fail "product not installed" "env/atl-env.sh $PROFILE install"
+  "configure_${PRODUCT}_files"
 
   # 4. Docker network and volumes (database data and home dir live in Docker volumes:
   #    Windows bind mounts are slow and break Lucene index file locking).
@@ -101,6 +155,7 @@ cmd_configure() {
   docker network inspect "$NET" >/dev/null 2>&1 || docker network create "$NET" >/dev/null
   docker volume inspect "$DB_VOL" >/dev/null 2>&1 || docker volume create "$DB_VOL" >/dev/null
   docker volume inspect "$HOME_VOL" >/dev/null 2>&1 || docker volume create "$HOME_VOL" >/dev/null
+  if [ "$PRODUCT" = jira ]; then configure_jira_home; fi
   mkdir -p "$LOGS_DIR"
   log "configure complete (memory ${JVM_MIN_MEM}/${JVM_MAX_MEM}, port ${HTTP_PORT}, context '${CONTEXT_PATH}')"
 }
@@ -129,12 +184,14 @@ start_app() {
   # container is always re-created. This applies any change to the profile settings.
   ct_exists "$APP_CT" && docker rm "$APP_CT" >/dev/null
   log "creating product container $APP_CT ($JAVA_IMAGE, $BASE_URL)"
-  docker run -d --name "$APP_CT" --network "$NET" -p "127.0.0.1:${HTTP_PORT}:8090" \
+  # JIRA_HOME is read by Jira's setenv.sh; Confluence ignores it.
+  docker run -d --name "$APP_CT" --network "$NET" -p "127.0.0.1:${HTTP_PORT}:${APP_PORT_IN_CT}" \
     -v "$(hostpath "$INSTALL_DIR"):$APP_INSTALL_IN_CT" \
     -v "$HOME_VOL:$APP_HOME_IN_CT" \
-    -v "$(hostpath "$LOGS_DIR"):$APP_HOME_IN_CT/logs" \
+    -v "$(hostpath "$LOGS_DIR"):$APP_HOME_IN_CT/$LOG_SUBDIR" \
+    -e JIRA_HOME="$APP_HOME_IN_CT" \
     -e CATALINA_OPTS="-Duser.language=en -Duser.country=US -Duser.timezone=UTC ${EXTRA_JVM_OPTS:-}" \
-    "$JAVA_IMAGE" "$APP_INSTALL_IN_CT/bin/start-confluence.sh" -fg >/dev/null \
+    "$JAVA_IMAGE" "$APP_INSTALL_IN_CT/$START_SCRIPT" -fg >/dev/null \
     || fail "product container did not start" "docker logs $APP_CT"
 }
 
@@ -156,7 +213,7 @@ wait_healthy() {
 
 cmd_start() {
   require_docker
-  [ -f "$INSTALL_DIR/bin/start-confluence.sh" ] || fail "product not installed" "env/atl-env.sh $PROFILE install"
+  [ -f "$INSTALL_DIR/$START_SCRIPT" ] || fail "product not installed" "env/atl-env.sh $PROFILE install"
   cmd_configure
   start_db
   start_app
@@ -177,7 +234,7 @@ cmd_status() {
 }
 
 cmd_logs() {
-  local f="$LOGS_DIR/atlassian-confluence.log"
+  local f="$LOGS_DIR/$LOG_FILE_NAME"
   if [ -f "$f" ]; then tail -n 200 -f "$f"; else docker logs --tail 200 -f "$APP_CT"; fi
 }
 
@@ -266,7 +323,7 @@ cmd_snapshot() {
     || fail "pg_dump failed" "docker logs $DB_CT"
   docker cp "$DB_CT:/tmp/snapshot.dump" "$(hostpath "$SNAPSHOT_DIR/db.dump")" >/dev/null
   docker run --rm -v "$HOME_VOL:/data" -v "$(hostpath "$SNAPSHOT_DIR"):/backup" "$JAVA_IMAGE" \
-    tar --exclude=./logs --exclude=./temp -C /data -czf /backup/home.tgz . \
+    tar --exclude="./$LOG_SUBDIR" --exclude=./temp -C /data -czf /backup/home.tgz . \
     || fail "home dir archive failed" "docker volume inspect $HOME_VOL"
   date -u +%Y-%m-%dT%H:%M:%SZ > "$SNAPSHOT_DIR/created"
   log "snapshot saved in $SNAPSHOT_DIR"
@@ -289,7 +346,7 @@ cmd_restore() {
     || fail "pg_restore failed" "docker logs $DB_CT"
   log "restoring home dir"
   docker run --rm -v "$HOME_VOL:/data" -v "$(hostpath "$SNAPSHOT_DIR"):/backup" "$JAVA_IMAGE" \
-    sh -c 'find /data -mindepth 1 -maxdepth 1 ! -name logs -exec rm -rf {} + && tar -C /data -xzf /backup/home.tgz' \
+    sh -c 'find /data -mindepth 1 -maxdepth 1 ! -name '$LOG_SUBDIR' -exec rm -rf {} + && tar -C /data -xzf /backup/home.tgz' \
     || fail "home dir restore failed" "docker volume inspect $HOME_VOL"
   rm -rf "$LOGS_DIR" && mkdir -p "$LOGS_DIR"
   start_app

@@ -3,11 +3,15 @@
 import { test } from '@playwright/test';
 import { Confluence6Wizard } from './wizards/Confluence6Wizard.js';
 import { Confluence9Wizard } from './wizards/Confluence9Wizard.js';
+import { JiraWizard } from './wizards/JiraWizard.js';
+import { Jira10Wizard } from './wizards/Jira10Wizard.js';
 import type { SetupWizard } from './wizards/SetupWizard.js';
 
 const wizards: Record<string, () => SetupWizard> = {
   'confluence-6': () => new Confluence6Wizard(),
   'confluence-9': () => new Confluence9Wizard(),
+  jira: () => new JiraWizard(),
+  'jira-10': () => new Jira10Wizard(),
 };
 
 function required(name: string): string {

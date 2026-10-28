@@ -2,14 +2,15 @@ import { test as base, expect, type Page, type PlaywrightWorkerArgs } from '@pla
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createAdapter, type AdapterName, type HostAdapter } from '../adapters/index.js';
-import { ConfluenceRest, credentialsFromEnv, type Credentials } from './rest.js';
-
-export const APP_KEY = 'org.techtime.confluence.plugins.easysso';
+import { createRest, credentialsFromEnv, type Credentials, type HostRest, type Product } from './rest.js';
 
 /** Per-project options, set in playwright.config.ts from tests/targets.ts. */
 export interface SuiteOptions {
   adapterName: AdapterName;
   targetName: string;
+  product: Product;
+  /** Key of the app under test (from tests/targets.ts). */
+  appKey: string;
   hostVersion: string;
   /** Same value as baseURL; worker-scoped so worker-scoped fixtures can use it. */
   hostBaseURL: string;
@@ -18,7 +19,7 @@ export interface SuiteOptions {
 interface TestFixtures {
   adapter: HostAdapter;
   creds: Credentials;
-  rest: ConfluenceRest;
+  rest: HostRest;
   /** A new non-admin user for this test (created by REST: setup only; removed afterwards). */
   testUser: Credentials;
   /** Removes all EasySSO header rules before and after the test (REST: setup and teardown only). */
@@ -32,9 +33,13 @@ interface TestFixtures {
   failureEvidence: void;
 }
 
-/** Product log for failure evidence. ATL_LOG_FILE overrides the default local path. */
-function productLogPath(targetName: string): string {
-  return process.env.ATL_LOG_FILE ?? `env/instances/${targetName}/home/logs/atlassian-confluence.log`;
+/**
+ * Product log for failure evidence. ATL_LOG_FILE overrides the default local path
+ * (where env/atl-env.sh mounts the log directory of the home dir).
+ */
+function productLogPath(targetName: string, product: Product): string {
+  const local = product === 'jira' ? 'log/atlassian-jira.log' : 'logs/atlassian-confluence.log';
+  return process.env.ATL_LOG_FILE ?? `env/instances/${targetName}/home/${local}`;
 }
 
 function lastLines(file: string, n: number): string {
@@ -51,11 +56,13 @@ function restContext(playwright: PlaywrightWorkerArgs['playwright'], baseURL: st
   return playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
 }
 
-export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' | 'hostVersion'>,
-  Pick<SuiteOptions, 'hostBaseURL' | 'targetName'>>({
+export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' | 'hostVersion' | 'appKey'>,
+  Pick<SuiteOptions, 'hostBaseURL' | 'targetName' | 'product'>>({
   adapterName: ['confluence-6', { option: true }],
   targetName: ['', { option: true, scope: 'worker' }],
   hostVersion: ['', { option: true }],
+  appKey: ['', { option: true }],
+  product: ['confluence', { option: true, scope: 'worker' }],
   hostBaseURL: ['', { option: true, scope: 'worker' }],
 
   adapter: async ({ adapterName }, use) => {
@@ -66,9 +73,9 @@ export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' 
     await use(credentialsFromEnv());
   },
 
-  rest: async ({ playwright, hostBaseURL, creds }, use) => {
+  rest: async ({ playwright, hostBaseURL, product, creds }, use) => {
     const request = await restContext(playwright, hostBaseURL);
-    await use(new ConfluenceRest(request, creds));
+    await use(createRest(product, request, creds));
     await request.dispose();
   },
 
@@ -104,7 +111,7 @@ export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' 
   },
 
   failureEvidence: [
-    async ({ page, targetName, hostVersion, rest }, use, testInfo) => {
+    async ({ page, targetName, hostVersion, product, appKey, rest }, use, testInfo) => {
       const consoleErrors: string[] = [];
       page.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(`${msg.location().url}: ${msg.text()}`);
@@ -114,16 +121,16 @@ export const test = base.extend<TestFixtures & Pick<SuiteOptions, 'adapterName' 
       await use();
 
       if (testInfo.status === testInfo.expectedStatus) return;
-      const appVersion = await rest.appVersion(APP_KEY).catch((e) => `unknown (${e})`);
+      const appVersion = await rest.appVersion(appKey).catch((e) => `unknown (${e})`);
       await testInfo.attach('host-and-app.txt', {
-        body: `target: ${targetName}\nhost version: ${hostVersion}\napp ${APP_KEY}: ${appVersion}\n`,
+        body: `target: ${targetName}\nhost version: ${hostVersion}\napp ${appKey}: ${appVersion}\n`,
         contentType: 'text/plain',
       });
       await testInfo.attach('browser-console-errors.txt', {
         body: consoleErrors.join('\n') || '(none)',
         contentType: 'text/plain',
       });
-      const log = productLogPath(targetName);
+      const log = productLogPath(targetName, product);
       await testInfo.attach('product-log-last-200-lines.txt', {
         body: existsSync(log) ? lastLines(log, 200) : `(log file not found: ${log})`,
         contentType: 'text/plain',
